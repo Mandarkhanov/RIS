@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// Добавить функционал того, чтобы одна и та же задача не выполнялась при повторном запуске
 type RequestState struct {
 	Hash            string
 	MaxLength       int

@@ -1,7 +1,6 @@
 package models
 
 type WorkerTask struct {
-	// XMLName    xml.Name `xml:"http://ccfit.nsu.ru/schema/crack-hash-request CrackHashManagerRequest"`
 	RequestID  string   `xml:"RequestId"`
 	Hash       string   `xml:"Hash"`
 	MaxLength  int      `xml:"MaxLength"`
@@ -15,7 +14,6 @@ type Alphabet struct {
 }
 
 type WorkerResponse struct {
-	// XMLName    xml.Name `xml:"http://ccfit.nsu.ru/schema/crack-hash-response CrackHashWorkerResponse"`
 	RequestID  string  `xml:"RequestId"`
 	PartNumber int     `xml:"PartNumber"`
 	Answers    Answers `xml:"Answers"`
