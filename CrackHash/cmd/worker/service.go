@@ -26,8 +26,9 @@ func (a *WorkerApp) processTask(ctx context.Context, task models.WorkerTask) {
 	var foundWords []string
 
 	alphabetStr := strings.Join(task.Alphabet.Symbols, "")
-	alphabetRune := []rune(alphabetStr)
-	totalCombinations := generator.CalculateTotalWords(len(alphabetRune), task.MaxLength)
+	alphabetBytes := []byte(alphabetStr)
+	aLen := len(alphabetBytes)
+	totalCombinations := generator.TotalWords(aLen, task.MaxLength)
 
 	chunkSize := (totalCombinations + int64(task.PartCount) - 1) / int64(task.PartCount)
 	startIdx := int64(task.PartNumber-1) * chunkSize
@@ -35,32 +36,52 @@ func (a *WorkerApp) processTask(ctx context.Context, task models.WorkerTask) {
 	if endIdx > totalCombinations {
 		endIdx = totalCombinations
 	}
+
+	// Воркеров больше количества комбинаций
 	if startIdx >= totalCombinations {
+		log.Printf("Worker %d has no work (startIdx >= totalCombinations)", task.PartNumber)
+		a.sendResultToManager(task.RequestID, task.PartNumber, nil)
 		return
 	}
 
-	log.Printf("Worker processing task [%s, %s)",
-		generator.GetWordAtIndex(startIdx, alphabetRune),
-		generator.GetWordAtIndex(endIdx, alphabetRune),
-	)
+	targetHashBytes, err := hex.DecodeString(task.Hash)
+	if err != nil {
+		log.Printf("Worker %d error decoding target hash: %v", task.PartNumber, err)
+		a.sendResultToManager(task.RequestID, task.PartNumber, nil)
+		return
+	}
 
-	targetHashBytes, _ := hex.DecodeString(task.Hash)
+	log.Printf("Worker %d START processing task [%d, %d)\n", task.PartNumber, startIdx, endIdx)
+	gen := generator.NewGenerator(alphabetBytes, startIdx)
+	wordBuf := make([]byte, len(gen.State))
+
 	for i := startIdx; i < endIdx; i++ {
-		if ctx.Err() != nil {
+		if i%a.cfg.ContextCheckInterval == 0 && ctx.Err() != nil {
 			log.Printf("Worker STOPPED task %s by Manager request", task.RequestID)
-
 			if len(foundWords) > 0 {
 				a.sendResultToManager(task.RequestID, task.PartNumber, foundWords)
 			}
 			return
 		}
 
-		word := generator.GetWordAtIndex(i, alphabetRune)
-		hash := md5.Sum([]byte(word))
+		wordBuf = gen.CurrentWordBytes(wordBuf)
+		hash := md5.Sum(wordBuf)
 
 		if bytes.Equal(hash[:], targetHashBytes) {
-			foundWords = append(foundWords, word)
+			foundWords = append(foundWords, string(wordBuf))
+			log.Printf("Worker %d FOUND match: %s\n", task.PartNumber, foundWords[len(foundWords)-1])
+			if a.cfg.StopOnFirstMatch {
+				break
+			}
 		}
+
+		gen.NextState()
+	}
+
+	if len(foundWords) > 0 {
+		log.Printf("Worker %d FINISHED. Found %d words\n", task.PartNumber, len(foundWords))
+	} else {
+		log.Printf("Worker %d FINISHED. No words found.\n", task.PartNumber)
 	}
 
 	a.sendResultToManager(task.RequestID, task.PartNumber, foundWords)
@@ -70,9 +91,7 @@ func (a *WorkerApp) sendResultToManager(reqID string, partNumber int, foundWords
 	resp := models.WorkerResponse{
 		RequestID:  reqID,
 		PartNumber: partNumber,
-		Answers: models.Answers{
-			Words: foundWords,
-		},
+		Answers:    models.Answers{Words: foundWords},
 	}
 
 	body, err := xml.Marshal(resp)
@@ -88,7 +107,7 @@ func (a *WorkerApp) sendResultToManager(reqID string, partNumber int, foundWords
 	}
 	req.Header.Set("Content-Type", "application/xml")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: a.cfg.ClientTimeout}
 	res, err := client.Do(req)
 	if err != nil {
 		log.Printf("Worker error sending result to manager: %v", err)
