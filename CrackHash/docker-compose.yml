@@ -27,6 +27,12 @@ services:
     container_name: worker1
     environment:
       MANAGER_URL: ${MANAGER_URL}
+      READ_TIMEOUT: ${WORKER_READ_TIMEOUT}
+      WRITE_TIMEOUT: ${WORKER_WRITE_TIMEOUT}
+      IDLE_TIMEOUT: ${WORKER_IDLE_TIMEOUT}
+      CLIENT_TIMEOUT: ${WORKER_CLIENT_TIMEOUT}
+      CONTEXT_CHECK_INTERVAL: ${WORKER_CONTEXT_CHECK_INTERVAL}
+      STOP_ON_FIRST_MATCH: ${WORKER_STOP_ON_FIRST_MATCH}
     depends_on:
       - manager
     networks:
@@ -41,6 +47,12 @@ services:
     container_name: worker2
     environment:
       MANAGER_URL: ${MANAGER_URL}
+      READ_TIMEOUT: ${WORKER_READ_TIMEOUT}
+      WRITE_TIMEOUT: ${WORKER_WRITE_TIMEOUT}
+      IDLE_TIMEOUT: ${WORKER_IDLE_TIMEOUT}
+      CLIENT_TIMEOUT: ${WORKER_CLIENT_TIMEOUT}
+      CONTEXT_CHECK_INTERVAL: ${WORKER_CONTEXT_CHECK_INTERVAL}
+      STOP_ON_FIRST_MATCH: ${WORKER_STOP_ON_FIRST_MATCH}
     depends_on:
       - manager
     networks:
@@ -55,6 +67,12 @@ services:
     container_name: worker3
     environment:
       MANAGER_URL: ${MANAGER_URL}
+      READ_TIMEOUT: ${WORKER_READ_TIMEOUT}
+      WRITE_TIMEOUT: ${WORKER_WRITE_TIMEOUT}
+      IDLE_TIMEOUT: ${WORKER_IDLE_TIMEOUT}
+      CLIENT_TIMEOUT: ${WORKER_CLIENT_TIMEOUT}
+      CONTEXT_CHECK_INTERVAL: ${WORKER_CONTEXT_CHECK_INTERVAL}
+      STOP_ON_FIRST_MATCH: ${WORKER_STOP_ON_FIRST_MATCH}
     depends_on:
       - manager
     networks:

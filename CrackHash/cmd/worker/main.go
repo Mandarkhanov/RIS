@@ -22,10 +22,8 @@ func NewWorkerApp(cfg *Config) *WorkerApp {
 
 func (app *WorkerApp) setupServer() *http.ServeMux {
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/internal/api/worker/hash/crack/task", app.handleTask)
 	mux.HandleFunc("/internal/api/worker/hash/crack/cancel", app.handleCancel)
-
 	return mux
 }
 
@@ -38,6 +36,18 @@ func main() {
 	app := NewWorkerApp(cfg)
 	mux := app.setupServer()
 
+	srv := &http.Server{
+		Addr:         ":" + app.cfg.Port,
+		Handler:      mux,
+		ReadTimeout:  app.cfg.ReadTimeout,
+		WriteTimeout: app.cfg.WriteTimeout,
+		IdleTimeout:  app.cfg.IdleTimeout,
+	}
+
 	log.Printf("Worker started on :%s", app.cfg.Port)
-	log.Fatal(http.ListenAndServe(":"+app.cfg.Port, mux))
+	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		log.Fatalf("Server error: %v", err)
+	}
+
+	// TO DO: Добавить Graceful Shutdown позже (в отдельном коммите или даже ветке)
 }
