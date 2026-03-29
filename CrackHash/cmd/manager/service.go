@@ -6,7 +6,6 @@ import (
 	"encoding/xml"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -17,13 +16,15 @@ var alphabet = []string{
 }
 
 func (a *ManagerApp) dispatchTasks(reqID string, req models.CrackRequest) {
-	for i, url := range a.cfg.WorkersURLs {
+	client := &http.Client{Timeout: a.cfg.ClientTimeout}
+
+	for i, nodeURL := range a.cfg.WorkerNodes {
 		task := models.WorkerTask{
 			RequestID:  reqID,
 			Hash:       req.Hash,
 			MaxLength:  req.MaxLength,
 			PartNumber: i + 1,
-			PartCount:  len(a.cfg.WorkersURLs),
+			PartCount:  len(a.cfg.WorkerNodes),
 			Alphabet:   models.Alphabet{Symbols: alphabet},
 		}
 
@@ -33,19 +34,28 @@ func (a *ManagerApp) dispatchTasks(reqID string, req models.CrackRequest) {
 			continue
 		}
 
-		go func(workerURL string, body []byte) {
-			resp, err := http.Post(workerURL, "application/xml", bytes.NewBuffer(body))
+		taskURL := nodeURL + WorkerTaskPath
+
+		go func(url string, body []byte) {
+			req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
 			if err != nil {
-				log.Printf("Failed to send task to worker at %s: %v", workerURL, err)
+				log.Printf("Failed creating http request for worker %s: %v", url, err)
+				return
+			}
+			req.Header.Set("Content-Type", "application/xml")
+
+			resp, err := client.Do(req)
+			if err != nil {
+				log.Printf("Failed to send task to worker at %s: %v", url, err)
 				return
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
-				log.Printf("Worker %s return non-200 status code: %d", workerURL, resp.StatusCode)
+				log.Printf("Worker %s return non-200 status code: %d", url, resp.StatusCode)
 			}
 
-		}(url, body)
+		}(taskURL, body)
 	}
 }
 
@@ -81,21 +91,35 @@ func (a *ManagerApp) timeoutWatcher() {
 
 func (a *ManagerApp) cancelTask(reqID string) {
 	cancelReq := models.WorkerCancelRequest{RequestID: reqID}
-	body, _ := xml.Marshal(cancelReq)
 
-	for _, taskURL := range a.cfg.WorkersURLs {
-		cancelURL := strings.Replace(taskURL, "/task", "/cancel", 1)
+	body, err := xml.Marshal(cancelReq)
+	if err != nil {
+		log.Printf("Failed marshalling cancel request: %v", err)
+		return
+	}
+
+	client := &http.Client{Timeout: a.cfg.ClientTimeout}
+
+	for _, nodeURL := range a.cfg.WorkerNodes {
+		cancelURL := nodeURL + WorkerCancelPath
 
 		go func(url string) {
-			resp, err := http.Post(url, "application/xml", bytes.NewBuffer(body))
+			req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
 			if err != nil {
-				log.Printf("Failed to cancel task to worker at %s: %v", taskURL, err)
+				log.Printf("Failed creating http request for worker %s: %v", url, err)
+				return
+			}
+			req.Header.Set("Content-Type", "application/xml")
+
+			resp, err := client.Do(req)
+			if err != nil {
+				log.Printf("Failed to send cancel task to %s: %v", url, err)
 				return
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
-				log.Printf("Worker %s return non-200 status code: %d", taskURL, resp.StatusCode)
+				log.Printf("Worker %s return non-200 status code: %d", url, resp.StatusCode)
 			}
 		}(cancelURL)
 	}

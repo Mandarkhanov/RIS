@@ -11,15 +11,26 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	ErrMsgNonPostMethodNotAllowed  = "Non-POST method not allowed"
+	ErrMsgNonGetMethodNotAllowed   = "Non-GET method not allowed"
+	ErrMsgNonPatchMethodNotAllowed = "Non-PATCH method not allowed"
+
+	ErrMsgMissingReqID = "Missing requestId parameter"
+	ErrMsgReqNotFound  = "RequestNotFound"
+
+	ErrMsgInvalidJSON = "Invalid JSON body"
+)
+
 func (a *ManagerApp) handleCrackRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ErrMsgNonPostMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req models.CrackRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+		http.Error(w, ErrMsgInvalidJSON, http.StatusBadRequest)
 		return
 	}
 
@@ -30,7 +41,7 @@ func (a *ManagerApp) handleCrackRequest(w http.ResponseWriter, r *http.Request) 
 		Status:          models.StatusInProgress,
 		Data:            []string{},
 		WorkersFinished: 0,
-		TotalWorkers:    len(a.cfg.WorkersURLs),
+		TotalWorkers:    len(a.cfg.WorkerNodes),
 		CreatedAt:       time.Now(),
 	}
 
@@ -43,7 +54,7 @@ func (a *ManagerApp) handleCrackRequest(w http.ResponseWriter, r *http.Request) 
 	if finalReqID == reqID {
 		go a.dispatchTasks(reqID, req)
 	} else {
-		log.Printf("Task for Hash %s & MaxLength %d already exists with ID: %s", req.Hash, req.MaxLength, finalReqID)
+		log.Printf("Task with [hash:%s | maxLength:%d] already exists with ID: %s", req.Hash, req.MaxLength, finalReqID)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -52,26 +63,26 @@ func (a *ManagerApp) handleCrackRequest(w http.ResponseWriter, r *http.Request) 
 
 func (a *ManagerApp) handleCrackStatusCheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ErrMsgNonGetMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
 	reqID := r.URL.Query().Get("requestId")
 	if reqID == "" {
-		http.Error(w, "Missing requestId parameter", http.StatusBadRequest)
+		http.Error(w, ErrMsgMissingReqID, http.StatusBadRequest)
 		return
 	}
 
 	state, exists := a.storage.Get(reqID)
 	if !exists {
-		http.Error(w, "Request not found", http.StatusNotFound)
+		http.Error(w, ErrMsgReqNotFound, http.StatusNotFound)
 		return
 	}
 
 	state.mu.Lock()
 	defer state.mu.Unlock()
 
-	var responseData []string = nil
+	var responseData []string
 	if state.Status == models.StatusReady || state.Status == models.StatusPartialReady {
 		responseData = state.Data
 	}
@@ -87,13 +98,13 @@ func (a *ManagerApp) handleCrackStatusCheck(w http.ResponseWriter, r *http.Reque
 
 func (a *ManagerApp) handleWorkerResponse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ErrMsgNonPatchMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
 	var resp models.WorkerResponse
 	if err := xml.NewDecoder(r.Body).Decode(&resp); err != nil {
-		http.Error(w, "Invalid XML body", http.StatusBadRequest)
+		http.Error(w, ErrMsgInvalidJSON, http.StatusBadRequest)
 		return
 	}
 

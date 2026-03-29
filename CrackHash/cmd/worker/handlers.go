@@ -7,15 +7,21 @@ import (
 	"net/http"
 )
 
+const (
+	ErrMsgNonPostMethodNotAllowed = "Non-POST method not allowed"
+
+	ErrMsgInvalidXML = "Invalid XML body"
+)
+
 func (a *WorkerApp) handleTask(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ErrMsgNonPostMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
 	var task models.WorkerTask
 	if err := xml.NewDecoder(r.Body).Decode(&task); err != nil {
-		http.Error(w, "Invalid XML body", http.StatusBadRequest)
+		http.Error(w, ErrMsgInvalidXML, http.StatusBadRequest)
 		return
 	}
 
@@ -31,13 +37,13 @@ func (a *WorkerApp) handleTask(w http.ResponseWriter, r *http.Request) {
 
 func (a *WorkerApp) handleCancel(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, ErrMsgNonPostMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
 	var req models.WorkerCancelRequest
 	if err := xml.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid XML body", http.StatusBadRequest)
+		http.Error(w, ErrMsgInvalidXML, http.StatusBadRequest)
 		return
 	}
 

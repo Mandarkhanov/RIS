@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+var (
+	ErrStorageFull = errors.New("Not enough memory at TasksStorage")
+)
+
 type RequestState struct {
 	Hash            string
 	MaxLength       int
@@ -53,7 +57,7 @@ func (s *TasksStorage) StoreOrGetExists(reqID string, state *RequestState) (stri
 	}
 
 	if len(s.tasks) >= s.size {
-		return "", errors.New("Not enough memory at TasksStorage!")
+		return "", ErrStorageFull
 	}
 
 	s.tasks[reqID] = state
