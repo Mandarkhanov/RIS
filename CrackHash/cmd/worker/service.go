@@ -46,18 +46,18 @@ func (a *WorkerApp) processTask(ctx context.Context, task models.WorkerTask) {
 
 	targetHashBytes, err := hex.DecodeString(task.Hash)
 	if err != nil {
-		log.Printf("Worker %d error decoding target hash: %v", task.PartNumber, err)
+		log.Printf("Worker %d failed decoding target hash: %v", task.PartNumber, err)
 		a.sendResultToManager(task.RequestID, task.PartNumber, nil)
 		return
 	}
 
-	log.Printf("Worker %d START processing task [%d, %d)\n", task.PartNumber, startIdx, endIdx)
+	log.Printf("Worker %d STARTED processing task [%d, %d)\n", task.PartNumber, startIdx, endIdx)
 	gen := generator.NewGenerator(alphabetBytes, startIdx)
 	wordBuf := make([]byte, len(gen.State))
 
 	for i := startIdx; i < endIdx; i++ {
-		if i%a.cfg.ContextCheckInterval == 0 && ctx.Err() != nil {
-			log.Printf("Worker STOPPED task %s by Manager request", task.RequestID)
+		if i%int64(a.cfg.ContextCheckInterations) == 0 && ctx.Err() != nil {
+			log.Printf("Worker %d STOPPED task %s by Manager request", task.PartNumber, task.RequestID)
 			if len(foundWords) > 0 {
 				a.sendResultToManager(task.RequestID, task.PartNumber, foundWords)
 			}
@@ -96,13 +96,14 @@ func (a *WorkerApp) sendResultToManager(reqID string, partNumber int, foundWords
 
 	body, err := xml.Marshal(resp)
 	if err != nil {
-		log.Printf("Worker error marshalling XML: %v", err)
+		log.Printf("Worker failed marshalling XML: %v", err)
 		return
 	}
 
-	req, err := http.NewRequest(http.MethodPatch, a.cfg.ManagerURL, bytes.NewBuffer(body))
+	managerRequestURL := a.cfg.ManagerNode + ManagerRequestPath
+	req, err := http.NewRequest(http.MethodPatch, managerRequestURL, bytes.NewBuffer(body))
 	if err != nil {
-		log.Printf("Worker error creating request: %v", err)
+		log.Printf("Worker failed creating request: %v", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/xml")
@@ -110,7 +111,7 @@ func (a *WorkerApp) sendResultToManager(reqID string, partNumber int, foundWords
 	client := &http.Client{Timeout: a.cfg.ClientTimeout}
 	res, err := client.Do(req)
 	if err != nil {
-		log.Printf("Worker error sending result to manager: %v", err)
+		log.Printf("Worker failed sending result to manager: %v", err)
 		return
 	}
 	defer res.Body.Close()

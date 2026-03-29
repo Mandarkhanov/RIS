@@ -57,7 +57,7 @@ func TotalWords(maxWordLength int, alphabetLength int) int64 {
 	return total
 }
 
-// возвращает длину слова и локальный индекс среди слов этой длины
+// Возвращает длину слова и локальный индекс среди слов этой длины
 func getLengthAndAdjustedIndex(idx int64, alphabetLength int) (int, int64) {
 	length := 1
 	countWordsOfLength := int64(alphabetLength)

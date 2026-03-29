@@ -20,10 +20,17 @@ func NewWorkerApp(cfg *Config) *WorkerApp {
 	}
 }
 
+const (
+	WorkerTaskPath   = "/internal/api/worker/hash/crack/task"
+	WorkerCancelPath = "/internal/api/worker/hash/crack/cancel"
+
+	ManagerRequestPath = "/internal/api/manager/hash/crack/request"
+)
+
 func (app *WorkerApp) setupServer() *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/internal/api/worker/hash/crack/task", app.handleTask)
-	mux.HandleFunc("/internal/api/worker/hash/crack/cancel", app.handleCancel)
+	mux.HandleFunc(WorkerTaskPath, app.handleTask)
+	mux.HandleFunc(WorkerCancelPath, app.handleCancel)
 	return mux
 }
 
@@ -35,7 +42,6 @@ func main() {
 
 	app := NewWorkerApp(cfg)
 	mux := app.setupServer()
-
 	srv := &http.Server{
 		Addr:         ":" + app.cfg.Port,
 		Handler:      mux,
@@ -49,5 +55,5 @@ func main() {
 		log.Fatalf("Server error: %v", err)
 	}
 
-	// TO DO: Добавить Graceful Shutdown позже (в отдельном коммите или даже ветке)
+	// TODO: Добавить Graceful Shutdown
 }

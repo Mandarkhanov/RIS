@@ -1,68 +1,51 @@
 package main
 
 import (
-	"os"
-	"strconv"
+	"crackhash/util"
 	"strings"
 	"time"
 )
 
 const (
+	DefaultPort              = "8080"
+	DefaultWorkerNodes       = "http://localhost:8081"
 	DefaultTasksStorageSize  = 1000
-	DefaultTaskTimeout       = 30
-	DefaultTaskWatchInterval = 5
+	DefaultTaskTimeout       = 30 * time.Second
+	DefaultTaskWatchInterval = 5 * time.Second
+	DefaultReadTimeout       = 10 * time.Second
+	DefaultWriteTimeout      = 10 * time.Second
+	DefaultIdleTimeout       = 120 * time.Second
+	DefaultClientTimeout     = 10 * time.Second
 )
 
 type Config struct {
-	Port        string
-	WorkersURLs []string
-
+	Port             string
+	WorkerNodes      []string
 	TasksStorageSize int
 	TaskTimeout      time.Duration
 	WatchInterval    time.Duration
+	ReadTimeout      time.Duration
+	WriteTimeout     time.Duration
+	IdleTimeout      time.Duration
+	ClientTimeout    time.Duration
 }
 
 func LoadConfig() (*Config, error) {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	urlsEnv := os.Getenv("WORKERS_URLS")
-	if urlsEnv == "" {
-		urlsEnv = "http://localhost:8081/internal/api/worker/hash/crack/task"
-	}
-	var urls []string
-	for _, u := range strings.Split(urlsEnv, ",") {
-		urls = append(urls, strings.TrimSpace(u))
-	}
-
-	storageSize := DefaultTasksStorageSize
-	if storageSizeStr := os.Getenv("MANAGER_MAX_TASKS_STORAGE"); storageSizeStr != "" {
-		if val, err := strconv.Atoi(storageSizeStr); err == nil {
-			storageSize = val
-		}
-	}
-
-	taskTimeout := DefaultTaskTimeout
-	if taskTimeoutStr := os.Getenv("MANAGER_TASK_TIMEOUT"); taskTimeoutStr != "" {
-		if val, err := strconv.Atoi(taskTimeoutStr); err == nil {
-			taskTimeout = val
-		}
-	}
-
-	watchInterval := DefaultTaskWatchInterval
-	if watchIntervalStr := os.Getenv("MANAGER_WATCH_INTERVAL"); watchIntervalStr != "" {
-		if val, err := strconv.Atoi(watchIntervalStr); err == nil {
-			watchInterval = val
-		}
+	nodesEnv := util.ParseString("WORKER_NODES", DefaultWorkerNodes)
+	var nodes []string
+	for _, n := range strings.Split(nodesEnv, ",") {
+		nodes = append(nodes, strings.TrimSpace(n))
 	}
 
 	return &Config{
-		Port:             port,
-		WorkersURLs:      urls,
-		TasksStorageSize: storageSize,
-		TaskTimeout:      time.Duration(taskTimeout) * time.Second,
-		WatchInterval:    time.Duration(watchInterval) * time.Second,
+		Port:             util.ParseString("PORT", DefaultPort),
+		WorkerNodes:      nodes,
+		TasksStorageSize: util.ParseInt("MANAGER_TASKS_STORAGE_SIZE", DefaultTasksStorageSize),
+		TaskTimeout:      util.ParseDuration("MANAGER_TASK_TIMEOUT", DefaultTaskTimeout),
+		WatchInterval:    util.ParseDuration("MANAGER_WATCH_INTERVAL", DefaultTaskWatchInterval),
+		ReadTimeout:      util.ParseDuration("READ_TIMEOUT", DefaultReadTimeout),
+		WriteTimeout:     util.ParseDuration("WRITE_TIMEOUT", DefaultWriteTimeout),
+		IdleTimeout:      util.ParseDuration("IDLE_TIMEOUT", DefaultIdleTimeout),
+		ClientTimeout:    util.ParseDuration("CLIENT_TIMEOUT", DefaultClientTimeout),
 	}, nil
 }
