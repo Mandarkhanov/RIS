@@ -1,7 +1,7 @@
-package main
+package config
 
 import (
-	"crackhash/util"
+	"crackhash/pkg/util"
 	"strings"
 	"time"
 )

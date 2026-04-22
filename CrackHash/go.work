@@ -3,4 +3,5 @@ go 1.25.0
 use (
 	./manager-service
 	./worker-service
+	./pkg
 )
