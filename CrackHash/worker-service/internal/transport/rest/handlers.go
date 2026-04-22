@@ -1,8 +1,8 @@
-package main
+package rest
 
 import (
-	"context"
-	"crackhash/pkg/models"
+	"crackhash/pkg/domain"
+	"crackhash/worker/internal/service"
 	"encoding/xml"
 	"net/http"
 )
@@ -13,46 +13,70 @@ const (
 	ErrMsgInvalidXML = "Invalid XML body"
 )
 
-func (a *WorkerApp) handleTask(w http.ResponseWriter, r *http.Request) {
+const (
+	WorkerTaskPath   = "/internal/api/worker/hash/crack/task"
+	WorkerCancelPath = "/internal/api/worker/hash/crack/cancel"
+
+	ManagerRequestPath = "/internal/api/manager/hash/crack/request"
+)
+
+type Handler struct {
+	svc *service.CrackWorkerService
+}
+
+func NewHandler(svc *service.CrackWorkerService) *Handler {
+	return &Handler{
+		svc: svc,
+	}
+}
+
+func (h *Handler) InitRoutes() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc(WorkerTaskPath, h.handleTask)
+	mux.HandleFunc(WorkerCancelPath, h.handleCancel)
+	return mux
+}
+
+func (h *Handler) handleTask(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, ErrMsgNonPostMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
-	var task models.WorkerTask
+	var task domain.WorkerTask
 	if err := xml.NewDecoder(r.Body).Decode(&task); err != nil {
 		http.Error(w, ErrMsgInvalidXML, http.StatusBadRequest)
 		return
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// ctx, cancel := context.WithCancel(context.Background())
 
-	a.mu.Lock()
-	a.activeTasks[task.RequestID] = cancel
-	a.mu.Unlock()
+	// h.mu.Lock()
+	// h.activeTasks[task.RequestID] = cancel
+	// h.mu.Unlock()
 
-	w.WriteHeader(http.StatusOK)
-	go a.processTask(ctx, task)
+	// w.WriteHeader(http.StatusOK)
+	// go h.processTask(ctx, task)
 }
 
-func (a *WorkerApp) handleCancel(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleCancel(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, ErrMsgNonPostMethodNotAllowed, http.StatusMethodNotAllowed)
 		return
 	}
 
-	var req models.WorkerCancelRequest
+	var req domain.WorkerCancelRequest
 	if err := xml.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, ErrMsgInvalidXML, http.StatusBadRequest)
 		return
 	}
 
-	a.mu.Lock()
-	if cancelFunc, exists := a.activeTasks[req.RequestID]; exists {
-		cancelFunc()
-		delete(a.activeTasks, req.RequestID)
-	}
-	a.mu.Unlock()
+	// h.mu.Lock()
+	// if cancelFunc, exists := h.activeTasks[req.RequestID]; exists {
+	// 	cancelFunc()
+	// 	delete(h.activeTasks, req.RequestID)
+	// }
+	// h.mu.Unlock()
 
 	w.WriteHeader(http.StatusOK)
 }
