@@ -36,12 +36,13 @@ func (a *ManagerApp) handleCrackRequest(w http.ResponseWriter, r *http.Request) 
 
 	reqID := uuid.New().String()
 	newState := &RequestState{
+		ReqID:           reqID,
 		Hash:            req.Hash,
 		MaxLength:       req.MaxLength,
 		Status:          models.StatusInProgress,
 		Data:            []string{},
 		WorkersFinished: 0,
-		TotalWorkers:    len(a.cfg.WorkerNodes),
+		TotalWorkers:    len(a.cfg.WorkerURLs),
 		CreatedAt:       time.Now(),
 	}
 

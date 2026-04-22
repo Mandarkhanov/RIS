@@ -18,13 +18,13 @@ var alphabet = []string{
 func (a *ManagerApp) dispatchTasks(reqID string, req models.CrackRequest) {
 	client := &http.Client{Timeout: a.cfg.ClientTimeout}
 
-	for i, nodeURL := range a.cfg.WorkerNodes {
+	for i, workerURL := range a.cfg.WorkerURLs {
 		task := models.WorkerTask{
 			RequestID:  reqID,
 			Hash:       req.Hash,
 			MaxLength:  req.MaxLength,
 			PartNumber: i + 1,
-			PartCount:  len(a.cfg.WorkerNodes),
+			PartCount:  len(a.cfg.WorkerURLs),
 			Alphabet:   models.Alphabet{Symbols: alphabet},
 		}
 
@@ -34,7 +34,7 @@ func (a *ManagerApp) dispatchTasks(reqID string, req models.CrackRequest) {
 			continue
 		}
 
-		taskURL := nodeURL + WorkerTaskPath
+		taskURL := workerURL + WorkerTaskPath
 
 		go func(url string, body []byte) {
 			req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
@@ -100,8 +100,8 @@ func (a *ManagerApp) cancelTask(reqID string) {
 
 	client := &http.Client{Timeout: a.cfg.ClientTimeout}
 
-	for _, nodeURL := range a.cfg.WorkerNodes {
-		cancelURL := nodeURL + WorkerCancelPath
+	for _, workerURL := range a.cfg.WorkerURLs {
+		cancelURL := workerURL + WorkerCancelPath
 
 		go func(url string) {
 			req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
