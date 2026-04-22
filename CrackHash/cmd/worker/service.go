@@ -100,7 +100,7 @@ func (a *WorkerApp) sendResultToManager(reqID string, partNumber int, foundWords
 		return
 	}
 
-	managerRequestURL := a.cfg.ManagerNode + ManagerRequestPath
+	managerRequestURL := a.cfg.ManagerURL + ManagerRequestPath
 	req, err := http.NewRequest(http.MethodPatch, managerRequestURL, bytes.NewBuffer(body))
 	if err != nil {
 		log.Printf("Worker failed creating request: %v", err)

@@ -7,7 +7,7 @@ import (
 
 const (
 	DefaultPort                   = "8081"
-	DefaultManagerNode            = "http://localhost:8080"
+	DefaultManagerURL             = "http://localhost:8080"
 	DefaultReadTimeout            = 10 * time.Second
 	DefaultWriteTimeout           = 10 * time.Second
 	DefaultIdleTimeout            = 120 * time.Second
@@ -18,7 +18,7 @@ const (
 
 type Config struct {
 	Port                    string
-	ManagerNode             string
+	ManagerURL              string
 	ReadTimeout             time.Duration
 	WriteTimeout            time.Duration
 	IdleTimeout             time.Duration
@@ -30,7 +30,7 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	return &Config{
 		Port:                    util.ParseString("PORT", DefaultPort),
-		ManagerNode:             util.ParseString("MANAGER_NODE", DefaultManagerNode),
+		ManagerURL:              util.ParseString("MANAGER_URL", DefaultManagerURL),
 		ReadTimeout:             util.ParseDuration("READ_TIMEOUT", DefaultReadTimeout),
 		WriteTimeout:            util.ParseDuration("WRITE_TIMEOUT", DefaultWriteTimeout),
 		IdleTimeout:             util.ParseDuration("IDLE_TIMEOUT", DefaultIdleTimeout),
