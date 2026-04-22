@@ -1,8 +1,8 @@
-package main
+package repository
 
 import (
 	"context"
-	"crackhash/pkg/models"
+	"crackhash/pkg/domain"
 	"errors"
 	"time"
 
@@ -19,7 +19,7 @@ type RequestState struct {
 	ReqID           string               `bson:"_id"`
 	Hash            string               `bson:"hash"`
 	MaxLength       int                  `bson:"maxLength"`
-	Status          models.RequestStatus `bson:"status"`
+	Status          domain.RequestStatus `bson:"status"`
 	Data            []string             `bson:"data"`
 	WorkersFinished int                  `bson:"workersFinished"`
 	TotalWorkers    int                  `bson:"totalWorkers"`

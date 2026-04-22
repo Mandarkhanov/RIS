@@ -1,4 +1,4 @@
-package models
+package domain
 
 type CrackRequest struct {
 	Hash      string `json:"hash"`

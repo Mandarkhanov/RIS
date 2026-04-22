@@ -1,4 +1,4 @@
-package models
+package domain
 
 type WorkerTask struct {
 	RequestID  string   `xml:"RequestId"`
