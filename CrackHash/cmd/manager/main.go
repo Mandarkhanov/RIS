@@ -1,19 +1,21 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"time"
 )
 
 type ManagerApp struct {
 	cfg     *Config
-	storage *TasksStorage
+	storage *MongoStorage
 }
 
-func NewManagerApp(cfg *Config) *ManagerApp {
+func NewManagerApp(cfg *Config, storage *MongoStorage) *ManagerApp {
 	return &ManagerApp{
 		cfg:     cfg,
-		storage: NewTasksStorage(cfg.TasksStorageSize),
+		storage: storage,
 	}
 }
 
@@ -30,7 +32,6 @@ func (a *ManagerApp) setupHandlers() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc(ManagerCrackPath, a.handleCrackRequest)
 	mux.HandleFunc(ManagerStatusPath, a.handleCrackStatusCheck)
-
 	mux.HandleFunc(ManagerRequestPath, a.handleWorkerResponse)
 	return mux
 }
@@ -41,7 +42,15 @@ func main() {
 		log.Fatalf("Failed to load config : %v\n", err)
 	}
 
-	app := NewManagerApp(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	storage, err := NewMongoStorage(ctx, cfg.MongoURL, cfg.MongoDBName)
+	if err != nil {
+		log.Fatalf("Failed to connect to MongoDB: %v\n", err)
+	}
+	defer storage.Disconnect(context.Background())
+
+	app := NewManagerApp(cfg, storage)
 	mux := app.setupHandlers()
 	srv := &http.Server{
 		Addr:         ":" + app.cfg.Port,
