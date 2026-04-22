@@ -1,5 +1,13 @@
 
 services:
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    ports:
+      - "${MONGODB_PORT}:${MONGODB_PORT}"
+    networks:
+      - crack-network
+
   manager:
     build:
       context: .
@@ -9,16 +17,19 @@ services:
     container_name: manager
     environment:
       PORT: ${INNER_SERVICE_PORT}
-      WORKER_NODES: ${WORKER_NODES}
-      MANAGER_TASKS_STORAGE_SIZE: ${MANAGER_TASKS_STORAGE_SIZE}
+      WORKER_URLS: ${WORKER_URLS}
       MANAGER_TASK_TIMEOUT: ${MANAGER_TASK_TIMEOUT}
       MANAGER_WATCH_INTERVAL: ${MANAGER_WATCH_INTERVAL}
       READ_TIMEOUT: ${MANAGER_READ_TIMEOUT}
       WRITE_TIMEOUT: ${MANAGER_WRITE_TIMEOUT}
       IDLE_TIMEOUT: ${MANAGER_IDLE_TIMEOUT}
       CLIENT_TIMEOUT: ${MANAGER_CLIENT_TIMEOUT}
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_NAME: ${MONGODB_NAME}
     ports:
       - "${MANAGER_PORT}:${INNER_SERVICE_PORT}"
+    depends_on:
+      - mongo
     networks:
       - crack-network
 
@@ -30,7 +41,8 @@ services:
         APP_CMD: "cmd/worker"
     container_name: worker1
     environment:
-      MANAGER_NODE: ${MANAGER_NODE}
+      PORT: ${WORKER_PORT}
+      MANAGER_URL: ${MANAGER_URL}
       READ_TIMEOUT: ${WORKER_READ_TIMEOUT}
       WRITE_TIMEOUT: ${WORKER_WRITE_TIMEOUT}
       IDLE_TIMEOUT: ${WORKER_IDLE_TIMEOUT}
@@ -50,7 +62,8 @@ services:
         APP_CMD: "cmd/worker"
     container_name: worker2
     environment:
-      MANAGER_NODE: ${MANAGER_NODE}
+      PORT: ${WORKER_PORT}
+      MANAGER_URL: ${MANAGER_URL}
       READ_TIMEOUT: ${WORKER_READ_TIMEOUT}
       WRITE_TIMEOUT: ${WORKER_WRITE_TIMEOUT}
       IDLE_TIMEOUT: ${WORKER_IDLE_TIMEOUT}
@@ -70,7 +83,8 @@ services:
         APP_CMD: "cmd/worker"
     container_name: worker3
     environment:
-      MANAGER_NODE: ${MANAGER_NODE}
+      PORT: ${WORKER_PORT}
+      MANAGER_URL: ${MANAGER_URL}
       READ_TIMEOUT: ${WORKER_READ_TIMEOUT}
       WRITE_TIMEOUT: ${WORKER_WRITE_TIMEOUT}
       IDLE_TIMEOUT: ${WORKER_IDLE_TIMEOUT}
