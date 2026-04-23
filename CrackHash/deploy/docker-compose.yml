@@ -3,6 +3,7 @@ services:
   mongo:
     image: mongo:latest
     container_name: mongo
+    command: ["--quiet"]
     ports:
       - "${MONGODB_PORT}:${MONGODB_PORT}"
     networks:
@@ -10,10 +11,8 @@ services:
 
   manager:
     build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        APP_CMD: "cmd/manager"
+      context: ../
+      dockerfile: manager-service/Dockerfile
     container_name: manager
     environment:
       PORT: ${INNER_SERVICE_PORT}
@@ -35,10 +34,8 @@ services:
 
   worker1:
     build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        APP_CMD: "cmd/worker"
+      context: ../
+      dockerfile: worker-service/Dockerfile
     container_name: worker1
     environment:
       PORT: ${WORKER_PORT}
@@ -56,10 +53,8 @@ services:
 
   worker2:
     build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        APP_CMD: "cmd/worker"
+      context: ../
+      dockerfile: worker-service/Dockerfile
     container_name: worker2
     environment:
       PORT: ${WORKER_PORT}
@@ -77,10 +72,8 @@ services:
 
   worker3:
     build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        APP_CMD: "cmd/worker"
+      context: ../
+      dockerfile: worker-service/Dockerfile
     container_name: worker3
     environment:
       PORT: ${WORKER_PORT}
