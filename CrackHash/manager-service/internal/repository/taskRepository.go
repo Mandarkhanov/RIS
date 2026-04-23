@@ -42,3 +42,75 @@ func NewTaskRepository(ctx context.Context, db *mongo.Database) (*TaskRepository
 		collection: collection,
 	}, nil
 }
+
+func (r *TaskRepository) StoreOrGetExists(ctx context.Context, state *RequestState) (string, error) {
+	_, err := r.collection.InsertOne(ctx, state)
+	if mongo.IsDuplicateKeyError(err) {
+		var existing RequestState
+		errFind := r.collection.FindOne(ctx, bson.M{"hash": state.Hash, "maxLength": state.MaxLength}).Decode(&existing)
+		if errFind != nil {
+			return "", errFind
+		}
+		return existing.ReqID, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return state.ReqID, nil
+}
+
+func (r *TaskRepository) Get(ctx context.Context, reqID string) (*RequestState, bool) {
+	var state RequestState
+	err := r.collection.FindOne(ctx, bson.M{"_id": reqID}).Decode(&state)
+	if err != nil {
+		return nil, false
+	}
+	return &state, true
+}
+
+func (r *TaskRepository) AddWorkerResult(ctx context.Context, reqID string, words []string) (*RequestState, error) {
+	update := bson.M{"$inc": bson.M{"workersFinished": 1}}
+	if len(words) > 0 {
+		update["$push"] = bson.M{"data": bson.M{"$each": words}}
+	}
+
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	var updatedState RequestState
+	err := r.collection.FindOneAndUpdate(ctx, bson.M{"_id": reqID}, update, opts).Decode(&updatedState)
+	if err != nil {
+		return nil, err
+	}
+
+	if updatedState.WorkersFinished == updatedState.TotalWorkers {
+		_, _ = r.collection.UpdateByID(ctx, reqID, bson.M{"$set": bson.M{"status": domain.StatusReady}})
+		updatedState.Status = domain.StatusReady
+	}
+	return &updatedState, nil
+}
+
+func (r *TaskRepository) GetAndMarkTimedOutTasks(ctx context.Context, timeout time.Duration) ([]string, error) {
+	deadline := time.Now().Add(-timeout)
+	filter := bson.M{"status": domain.StatusInProgress, "createdAt": bson.M{"$lt": deadline}}
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var timedOutTasks []RequestState
+	if err := cursor.All(ctx, &timedOutTasks); err != nil {
+		return nil, err
+	}
+
+	var cancelledIDs []string
+	for _, task := range timedOutTasks {
+		newStatus := domain.StatusError
+		if len(task.Data) > 0 {
+			newStatus = domain.StatusPartialReady
+		}
+		_, _ = r.collection.UpdateByID(ctx, task.ReqID, bson.M{"$set": bson.M{"status": newStatus}})
+		cancelledIDs = append(cancelledIDs, task.ReqID)
+	}
+	return cancelledIDs, nil
+}
