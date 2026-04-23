@@ -16,8 +16,6 @@ const (
 const (
 	WorkerTaskPath   = "/internal/api/worker/hash/crack/task"
 	WorkerCancelPath = "/internal/api/worker/hash/crack/cancel"
-
-	ManagerRequestPath = "/internal/api/manager/hash/crack/request"
 )
 
 type Handler struct {
@@ -49,14 +47,8 @@ func (h *Handler) handleTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ctx, cancel := context.WithCancel(context.Background())
-
-	// h.mu.Lock()
-	// h.activeTasks[task.RequestID] = cancel
-	// h.mu.Unlock()
-
-	// w.WriteHeader(http.StatusOK)
-	// go h.processTask(ctx, task)
+	h.svc.StartTask(task)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handler) handleCancel(w http.ResponseWriter, r *http.Request) {
@@ -71,12 +63,6 @@ func (h *Handler) handleCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// h.mu.Lock()
-	// if cancelFunc, exists := h.activeTasks[req.RequestID]; exists {
-	// 	cancelFunc()
-	// 	delete(h.activeTasks, req.RequestID)
-	// }
-	// h.mu.Unlock()
-
+	h.svc.CancelTask(req.RequestID)
 	w.WriteHeader(http.StatusOK)
 }
