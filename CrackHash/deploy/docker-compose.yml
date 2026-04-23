@@ -1,13 +1,54 @@
 
 services:
-  mongo:
+  mongo-primary:
     image: mongo:latest
-    container_name: mongo
-    command: ["--quiet"]
+    container_name: mongo-primary
+    command: ["--replSet", "${MONGODB_REPLICA_SET}", "--bind_ip_all"]
     ports:
-      - "${MONGODB_PORT}:${MONGODB_PORT}"
+      - "${MONGO_PRIMARY_EXT_PORT}:${MONGO_INNER_PORT}"
     networks:
       - crack-network
+
+  mongo-secondary1:
+    image: mongo:latest
+    container_name: mongo-secondary1
+    command: ["--replSet", "${MONGODB_REPLICA_SET}", "--bind_ip_all"]
+    ports:
+      - "${MONGO_SEC1_EXT_PORT}:${MONGO_INNER_PORT}"
+    networks:
+      - crack-network
+
+  mongo-secondary2:
+    image: mongo:latest
+    container_name: mongo-secondary2
+    command: ["--replSet", "${MONGODB_REPLICA_SET}", "--bind_ip_all"]
+    ports:
+      - "${MONGO_SEC2_EXT_PORT}:${MONGO_INNER_PORT}"
+    networks:
+      - crack-network
+  mongo-setup:
+    image: mongo:latest
+    container_name: mongo-setup
+    depends_on:
+      - mongo-primary
+      - mongo-secondary1
+      - mongo-secondary2
+    networks:
+      - crack-network
+    command: >
+      bash -c "
+        sleep 5;
+        mongosh --host ${MONGO_PRIMARY} --eval '
+          rs.initiate({
+            _id: \"${MONGODB_REPLICA_SET}\",
+            members: [
+              { _id: 0, host: \"${MONGO_PRIMARY}\" },
+              { _id: 1, host: \"${MONGO_SECONDARY1}\" },
+              { _id: 2, host: \"${MONGO_SECONDARY2}\" }
+            ]
+          });
+        '
+      "
 
   manager:
     build:
@@ -28,7 +69,7 @@ services:
     ports:
       - "${MANAGER_PORT}:${INNER_SERVICE_PORT}"
     depends_on:
-      - mongo
+      - mongo-setup
     networks:
       - crack-network
 
