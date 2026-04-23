@@ -1,27 +1,12 @@
 package main
 
 import (
-	"context"
 	"crackhash/worker/internal/config"
 	"crackhash/worker/internal/service"
 	"crackhash/worker/internal/transport/rest"
 	"log"
 	"net/http"
-	"sync"
 )
-
-type WorkerApp struct {
-	cfg         *config.Config
-	activeTasks map[string]context.CancelFunc
-	mu          sync.Mutex
-}
-
-func NewWorkerApp(cfg *config.Config) *WorkerApp {
-	return &WorkerApp{
-		cfg:         cfg,
-		activeTasks: make(map[string]context.CancelFunc),
-	}
-}
 
 func main() {
 	cfg, err := config.LoadConfig()

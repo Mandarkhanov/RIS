@@ -12,16 +12,6 @@ import (
 	"time"
 )
 
-// type ManagerApp struct {
-// 	cfg *config.Config
-// }
-
-// func NewManagerApp(cfg *config.Config) *ManagerApp {
-// 	return &ManagerApp{
-// 		cfg: cfg,
-// 	}
-// }
-
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
