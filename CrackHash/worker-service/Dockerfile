@@ -1,12 +1,13 @@
 FROM golang:alpine AS builder
 
 WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
 COPY . .
+
+WORKDIR /app/worker-service
+RUN go mod download
 RUN go build -o app_binary ./cmd/main.go
 
 FROM alpine:latest
 WORKDIR /app
-COPY --from=builder /app/app_binary .
+COPY --from=builder /app/worker-service/app_binary .
 CMD ["./app_binary"]
