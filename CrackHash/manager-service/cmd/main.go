@@ -6,9 +6,14 @@ import (
 	"crackhash/manager/internal/database"
 	"crackhash/manager/internal/repository"
 	"crackhash/manager/internal/service"
+	"crackhash/manager/internal/transport/amqp"
 	"crackhash/manager/internal/transport/rest"
+	"crackhash/pkg/rabbitmq"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -31,7 +36,27 @@ func main() {
 		log.Fatalf("Failed to init TaskRepository: %v", err)
 	}
 
-	crackManagerService := service.NewCrackManagerService(cfg, taskRepo)
+	rmqClient, err := rabbitmq.NewClient(cfg.RabbitMQURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
+	}
+	defer rmqClient.Close()
+
+	if err := rmqClient.DeclareQueue(cfg.TasksQueue); err != nil {
+		log.Fatalf("Failed to declare tasks queue: %v", err)
+	}
+	if err := rmqClient.DeclareQueue(cfg.ResultsQueue); err != nil {
+		log.Fatalf("Failed to declare results queue: %v", err)
+	}
+
+	crackManagerService := service.NewCrackManagerService(cfg, taskRepo, rmqClient)
+
+	msgs, err := rmqClient.Consume(cfg.ResultsQueue)
+	if err != nil {
+		log.Fatalf("Failed to consume from results queue: %v", err)
+	}
+	amqpConsumer := amqp.NewConsumer(crackManagerService)
+	go amqpConsumer.Start(msgs)
 
 	handler := rest.NewHandler(crackManagerService)
 	mux := handler.InitRoutes()
@@ -46,10 +71,16 @@ func main() {
 
 	go crackManagerService.TimeoutWatcher()
 
-	log.Println("Manager started on :" + cfg.Port)
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("Server error: %v", err)
-	}
+	go func() {
+		log.Println("Manager REST API started on :" + cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
 
-	// TODO: Добавить Graceful Shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("Manager is shutting down...")
 }

@@ -42,7 +42,6 @@ func main() {
 	consumer := amqp.NewConsumer(crackWorkerService)
 	go consumer.Start(msgs)
 
-	// 6. Graceful Shutdown (Ожидание сигнала завершения)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
