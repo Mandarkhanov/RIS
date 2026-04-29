@@ -3,8 +3,10 @@ package rest
 import (
 	"crackhash/manager/internal/service"
 	"crackhash/pkg/domain"
+	"crackhash/pkg/util"
 	"encoding/json"
 	"encoding/xml"
+	"log"
 	"net/http"
 )
 
@@ -16,7 +18,9 @@ const (
 	ErrMsgMissingReqID = "Missing requestId parameter"
 	ErrMsgReqNotFound  = "RequestNotFound"
 
-	ErrMsgInvalidJSON = "Invalid JSON body"
+	ErrMsgInvalidJSON         = "Invalid JSON body"
+	ErrMsgInvalidXML          = "Invalid XML body"
+	ErrMsgInternalServerError = "Internal server error"
 )
 
 type Handler struct {
@@ -39,65 +43,75 @@ func (h *Handler) InitRoutes() *http.ServeMux {
 
 func (h *Handler) handleCrackRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, ErrMsgNonPostMethodNotAllowed, http.StatusMethodNotAllowed)
+		log.Printf("Failed to handleCrackRequest: %s", ErrMsgNonPostMethodNotAllowed)
+		util.RespondWithJSONError(w, http.StatusMethodNotAllowed, ErrMsgNonPostMethodNotAllowed)
 		return
 	}
 
 	var req domain.CrackRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, ErrMsgInvalidJSON, http.StatusBadRequest)
+		log.Printf("Failed decode JSON: %v", err)
+		util.RespondWithJSONError(w, http.StatusBadRequest, ErrMsgInvalidJSON)
 		return
 	}
 
 	reqID, err := h.svc.CreateTask(r.Context(), req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("Failed to CreateTask: %v", err)
+		util.RespondWithJSONError(w, http.StatusInternalServerError, ErrMsgInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(domain.CrackResponse{RequestID: reqID})
+	log.Printf("Created task [%s]", reqID)
+	util.RespondWithJSON(w, http.StatusOK, domain.CrackResponse{RequestID: reqID})
 }
 
 func (h *Handler) handleCrackStatusCheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, ErrMsgNonGetMethodNotAllowed, http.StatusMethodNotAllowed)
+		log.Printf("Failed to handleCrackStatusCheck: %s", ErrMsgNonGetMethodNotAllowed)
+		util.RespondWithJSONError(w, http.StatusMethodNotAllowed, ErrMsgNonGetMethodNotAllowed)
 		return
 	}
 
 	reqID := r.URL.Query().Get("requestId")
 	if reqID == "" {
-		http.Error(w, ErrMsgMissingReqID, http.StatusBadRequest)
+		log.Printf("Failed to check status of task [%s]: %s", reqID, ErrMsgMissingReqID)
+		util.RespondWithJSONError(w, http.StatusBadRequest, ErrMsgMissingReqID)
 		return
 	}
 
 	resp, exists := h.svc.GetTaskStatus(r.Context(), reqID)
 	if !exists {
-		http.Error(w, ErrMsgReqNotFound, http.StatusNotFound)
+		log.Printf("Failed to handleCrackStatusCheck: %s", ErrMsgReqNotFound)
+		util.RespondWithJSONError(w, http.StatusNotFound, ErrMsgReqNotFound)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	log.Printf("Returned task [%s] status", reqID)
+	util.RespondWithJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) handleWorkerResponse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
-		http.Error(w, ErrMsgNonPatchMethodNotAllowed, http.StatusMethodNotAllowed)
+		log.Printf("Failed to handleWorkerResponse: %s", ErrMsgNonPatchMethodNotAllowed)
+		util.RespondWithXMLError(w, http.StatusMethodNotAllowed, ErrMsgNonPatchMethodNotAllowed)
 		return
 	}
 
 	var resp domain.WorkerResponse
 	if err := xml.NewDecoder(r.Body).Decode(&resp); err != nil {
-		http.Error(w, ErrMsgInvalidJSON, http.StatusBadRequest)
+		log.Printf("Failed to handleWorkerResponse: %v", err)
+		util.RespondWithXMLError(w, http.StatusBadRequest, ErrMsgInvalidXML)
 		return
 	}
 
 	err := h.svc.ProcessWorkerResult(r.Context(), resp)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		log.Printf("Failed to handleWorkerResponse: %v", err)
+		util.RespondWithXMLError(w, http.StatusInternalServerError, ErrMsgInternalServerError)
 		return
 	}
 
+	log.Printf("Processed worker response about task [%s]", resp.RequestID)
 	w.WriteHeader(http.StatusOK)
 }
