@@ -38,9 +38,8 @@ func NewCrackManagerService(cfg *config.Config, taskRepo *repository.TaskReposit
 }
 
 func (s *CrackManagerService) CreateTask(ctx context.Context, req domain.CrackRequest) (string, error) {
-	reqID := uuid.New().String()
 	newState := &repository.RequestState{
-		ReqID:           reqID,
+		ReqID:           uuid.New().String(),
 		Hash:            req.Hash,
 		MaxLength:       req.MaxLength,
 		Status:          domain.StatusInProgress,
@@ -55,8 +54,8 @@ func (s *CrackManagerService) CreateTask(ctx context.Context, req domain.CrackRe
 		return "", err
 	}
 
-	if finalReqID == reqID {
-		go s.DispatchTasks(reqID, req)
+	if finalReqID == newState.ReqID {
+		go s.DispatchTasks(newState.ReqID, req)
 	}
 	return finalReqID, nil
 }
