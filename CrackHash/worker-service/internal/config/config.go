@@ -17,25 +17,25 @@ const (
 )
 
 type Config struct {
-	Port                    string
-	ManagerURL              string
-	ReadTimeout             time.Duration
-	WriteTimeout            time.Duration
-	IdleTimeout             time.Duration
-	ClientTimeout           time.Duration
-	ContextCheckInterations int
-	StopOnFirstMatch        bool
+	Port                   string
+	ManagerURL             string
+	ReadTimeout            time.Duration
+	WriteTimeout           time.Duration
+	IdleTimeout            time.Duration
+	ClientTimeout          time.Duration
+	ContextCheckIterations int
+	StopOnFirstMatch       bool
 }
 
 func LoadConfig() (*Config, error) {
 	return &Config{
-		Port:                    util.ParseString("PORT", DefaultPort),
-		ManagerURL:              util.ParseString("MANAGER_URL", DefaultManagerURL),
-		ReadTimeout:             util.ParseDuration("READ_TIMEOUT", DefaultReadTimeout),
-		WriteTimeout:            util.ParseDuration("WRITE_TIMEOUT", DefaultWriteTimeout),
-		IdleTimeout:             util.ParseDuration("IDLE_TIMEOUT", DefaultIdleTimeout),
-		ClientTimeout:           util.ParseDuration("CLIENT_TIMEOUT", DefaultClientTimeout),
-		ContextCheckInterations: util.ParseInt("CONTEXT_CHECK_ITERATIONS", DefaultContextCheckIterations),
-		StopOnFirstMatch:        util.ParseBool("STOP_ON_FIRST_MATCH", DefaultStopOnFirstMatch),
+		Port:                   util.ParseString("PORT", DefaultPort),
+		ManagerURL:             util.ParseString("MANAGER_URL", DefaultManagerURL),
+		ReadTimeout:            util.ParseDuration("READ_TIMEOUT", DefaultReadTimeout),
+		WriteTimeout:           util.ParseDuration("WRITE_TIMEOUT", DefaultWriteTimeout),
+		IdleTimeout:            util.ParseDuration("IDLE_TIMEOUT", DefaultIdleTimeout),
+		ClientTimeout:          util.ParseDuration("CLIENT_TIMEOUT", DefaultClientTimeout),
+		ContextCheckIterations: util.ParseInt("CONTEXT_CHECK_ITERATIONS", DefaultContextCheckIterations),
+		StopOnFirstMatch:       util.ParseBool("STOP_ON_FIRST_MATCH", DefaultStopOnFirstMatch),
 	}, nil
 }

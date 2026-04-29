@@ -6,47 +6,43 @@ import (
 	"crackhash/pkg/domain"
 	"crackhash/worker/internal/config"
 	"crackhash/worker/internal/generator"
+	"crackhash/worker/internal/repository"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/xml"
 	"log"
 	"net/http"
 	"strings"
-	"sync"
 )
 
 const ManagerRequestPath = "/internal/api/manager/hash/crack/request"
 
 type CrackWorkerService struct {
-	cfg         *config.Config
-	activeTasks map[string]context.CancelFunc
-	mu          sync.Mutex
+	cfg             *config.Config
+	activeTasksRepo *repository.ActiveTaskRepository
 }
 
-func NewCrackWorkerService(cfg *config.Config) *CrackWorkerService {
+func NewCrackWorkerService(cfg *config.Config, activeTaskRepo *repository.ActiveTaskRepository) *CrackWorkerService {
 	return &CrackWorkerService{
-		cfg:         cfg,
-		activeTasks: make(map[string]context.CancelFunc),
+		cfg:             cfg,
+		activeTasksRepo: activeTaskRepo,
 	}
 }
 
 func (s *CrackWorkerService) StartTask(task domain.WorkerTask) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	s.mu.Lock()
-	s.activeTasks[task.RequestID] = cancel
-	s.mu.Unlock()
+	if !s.activeTasksRepo.Add(task.RequestID, cancel) {
+		cancel()
+		log.Printf("Task %s (Part %d) is already running. Ignoring duplicate.", task.RequestID, task.PartNumber)
+		return
+	}
 
 	go s.processTask(ctx, task)
 }
 
 func (s *CrackWorkerService) CancelTask(reqID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if cancelFunc, exists := s.activeTasks[reqID]; exists {
-		cancelFunc()
-		delete(s.activeTasks, reqID)
-	}
+	s.activeTasksRepo.Cancel(reqID)
 }
 
 func (s *CrackWorkerService) processTask(ctx context.Context, task domain.WorkerTask) {
@@ -85,7 +81,7 @@ func (s *CrackWorkerService) processTask(ctx context.Context, task domain.Worker
 	wordBuf := make([]byte, len(gen.State))
 
 	for i := startIdx; i < endIdx; i++ {
-		if i%int64(s.cfg.ContextCheckInterations) == 0 && ctx.Err() != nil {
+		if i%int64(s.cfg.ContextCheckIterations) == 0 && ctx.Err() != nil {
 			log.Printf("Worker %d STOPPED task %s by Manager request", task.PartNumber, task.RequestID)
 			if len(foundWords) > 0 {
 				s.sendResultToManager(task.RequestID, task.PartNumber, foundWords)

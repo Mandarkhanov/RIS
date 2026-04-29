@@ -2,6 +2,7 @@ package main
 
 import (
 	"crackhash/worker/internal/config"
+	"crackhash/worker/internal/repository"
 	"crackhash/worker/internal/service"
 	"crackhash/worker/internal/transport/rest"
 	"log"
@@ -14,8 +15,8 @@ func main() {
 		log.Fatalf("Failed to load config : %v", err)
 	}
 
-	crackWorkerService := service.NewCrackWorkerService(cfg)
-
+	activeTaskRepo := repository.NewActiveTaskRepository()
+	crackWorkerService := service.NewCrackWorkerService(cfg, activeTaskRepo)
 	handler := rest.NewHandler(crackWorkerService)
 	mux := handler.InitRoutes()
 
