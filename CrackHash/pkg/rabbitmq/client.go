@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -14,9 +15,22 @@ type Client struct {
 }
 
 func NewClient(amqpURL string) (*Client, error) {
-	conn, err := amqp.Dial(amqpURL)
+	var conn *amqp.Connection
+	var err error
+
+	maxRetries := 15
+	for i := 1; i <= maxRetries; i++ {
+		conn, err = amqp.Dial(amqpURL)
+		if err == nil {
+			break
+		}
+
+		log.Printf("RabbitMQ is not ready yet, retrying in 2s... (Attempt %d/%d)", i, maxRetries)
+		time.Sleep(2 * time.Second)
+	}
+
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to RabbitMQ: %w", err)
+		return nil, fmt.Errorf("Failed to connect to RabbitMQ after %d attempts: %w", maxRetries, err)
 	}
 
 	ch, err := conn.Channel()
