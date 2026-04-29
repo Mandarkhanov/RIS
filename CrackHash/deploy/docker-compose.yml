@@ -47,7 +47,8 @@ services:
               { _id: 2, host: \"${MONGO_SECONDARY2}\" }
             ]
           });
-        '
+        ' || true;
+        sleep 5;
       "
 
   manager:
@@ -69,7 +70,8 @@ services:
     ports:
       - "${MANAGER_PORT}:${INNER_SERVICE_PORT}"
     depends_on:
-      - mongo-setup
+      mongo-setup:
+        condition: service_completed_successfully
     networks:
       - crack-network
 
