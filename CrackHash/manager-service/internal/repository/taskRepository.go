@@ -18,6 +18,7 @@ type RequestState struct {
 	Data            []string             `bson:"data"`
 	WorkersFinished int                  `bson:"workersFinished"`
 	TotalWorkers    int                  `bson:"totalWorkers"`
+	PendingParts    []int                `bson:"pendingParts"`
 	CreatedAt       time.Time            `bson:"createdAt"`
 }
 
@@ -113,4 +114,26 @@ func (r *TaskRepository) GetAndMarkTimedOutTasks(ctx context.Context, timeout ti
 		cancelledIDs = append(cancelledIDs, task.ReqID)
 	}
 	return cancelledIDs, nil
+}
+
+func (r *TaskRepository) MarkPartDispatched(ctx context.Context, reqID string, partNumber int) error {
+	update := bson.M{"$pull": bson.M{"pendingParts": partNumber}}
+	_, err := r.collection.UpdateByID(ctx, reqID, update)
+	return err
+}
+
+func (r *TaskRepository) GetTasksWithPendingParts(ctx context.Context) ([]RequestState, error) {
+	filter := bson.M{"pendingParts.0": bson.M{"$exists": true}}
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var tasks []RequestState
+	if err := cursor.All(ctx, &tasks); err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }

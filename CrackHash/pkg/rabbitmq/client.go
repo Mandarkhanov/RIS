@@ -73,12 +73,12 @@ func (c *Client) DeclareQueue(name string) error {
 
 func (c *Client) PublishXML(ctx context.Context, queueName string, body []byte) error {
 	err := c.ch.PublishWithContext(ctx,
-		"",
+		"", // default direct exchange
 		queueName,
 		false,
 		false,
 		amqp.Publishing{
-			DeliveryMode: amqp.Persistent,
+			DeliveryMode: amqp.Persistent, // Сообщение персистентное
 			ContentType:  "application/xml",
 			Body:         body,
 		})
@@ -92,7 +92,7 @@ func (c *Client) Consume(queueName string) (<-chan amqp.Delivery, error) {
 	msgs, err := c.ch.Consume(
 		queueName,
 		"",
-		false,
+		false, // auto-ack = false (ручной ACK)
 		false,
 		false,
 		false,
