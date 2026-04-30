@@ -49,6 +49,10 @@ func main() {
 		log.Fatalf("Failed to declare results queue: %v", err)
 	}
 
+	if err := rmqClient.DeclareExchange("cancel_exchange", "fanout"); err != nil {
+		log.Fatalf("Failed to declare cancel exchange: %v", err)
+	}
+
 	crackManagerService := service.NewCrackManagerService(cfg, taskRepo, rmqClient)
 
 	msgs, err := rmqClient.Consume(cfg.ResultsQueue)

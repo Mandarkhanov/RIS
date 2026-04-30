@@ -6,31 +6,40 @@ import (
 )
 
 type ActiveTaskRepository struct {
-	activeTasks map[string]context.CancelFunc
-	mu          sync.Mutex
+	activeTasks    map[string]context.CancelFunc
+	cancelledTasks map[string]struct{}
+	mu             sync.Mutex
 }
 
 func NewActiveTaskRepository() *ActiveTaskRepository {
 	return &ActiveTaskRepository{
-		activeTasks: make(map[string]context.CancelFunc),
+		activeTasks:    make(map[string]context.CancelFunc),
+		cancelledTasks: make(map[string]struct{}),
 	}
 }
 
-func (r *ActiveTaskRepository) Add(reqID string, cancel context.CancelFunc) bool {
+func (r *ActiveTaskRepository) Add(reqID string, cancel context.CancelFunc) (added bool, cancelled bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	if _, exists := r.cancelledTasks[reqID]; exists {
+		return false, true
+	}
+
 	if _, exists := r.activeTasks[reqID]; exists {
-		return false
+		return false, false
 	}
 
 	r.activeTasks[reqID] = cancel
-	return true
+	return true, false
 }
 
 func (r *ActiveTaskRepository) Cancel(reqID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+
+	r.cancelledTasks[reqID] = struct{}{}
+
 	if cancel, exists := r.activeTasks[reqID]; exists {
 		cancel()
 		delete(r.activeTasks, reqID)

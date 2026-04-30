@@ -31,8 +31,26 @@ func main() {
 		log.Fatalf("Failed to declare results queue: %v", err)
 	}
 
+	if err := rmqClient.DeclareExchange("cancel_exchange", "fanout"); err != nil {
+		log.Fatalf("Failed to declare cancel exchange: %v", err)
+	}
+	cancelQueueName, err := rmqClient.DeclareEphemeralQueue()
+	if err != nil {
+		log.Fatalf("Failed to declare ephemeral queue: %v", err)
+	}
+	if err := rmqClient.BindQueue(cancelQueueName, "", "cancel_exchange"); err != nil {
+		log.Fatalf("Failed to bind cancel queue: %v", err)
+	}
+	cancelMsgs, err := rmqClient.Consume(cancelQueueName)
+	if err != nil {
+		log.Fatalf("Failed to consume from cancel queue: %v", err)
+	}
+
 	activeTaskRepo := repository.NewActiveTaskRepository()
 	crackWorkerService := service.NewCrackWorkerService(cfg, activeTaskRepo, rmqClient)
+
+	cancelConsumer := amqp.NewCancelConsumer(crackWorkerService)
+	go cancelConsumer.Start(cancelMsgs)
 
 	msgs, err := rmqClient.Consume(cfg.TasksQueue)
 	if err != nil {

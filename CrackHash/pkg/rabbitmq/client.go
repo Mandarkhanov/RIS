@@ -116,3 +116,58 @@ func (c *Client) Close() {
 		}
 	}
 }
+
+func (c *Client) DeclareExchange(name, kind string) error {
+	err := c.ch.ExchangeDeclare(
+		name, kind,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("Failed to declare exchange: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) DeclareEphemeralQueue() (string, error) {
+	q, err := c.ch.QueueDeclare(
+		"",    // пустое имя - RabbitMQ сгенерирует уникальное сам
+		false, // durable (нам не нужно хранить сигналы отмены упавших воркеров)
+		true,  // auto-delete (удалить при отключении)
+		true,  // exclusive (очередь принадлежит только этому соединению)
+		false,
+		nil,
+	)
+	if err != nil {
+		return "", fmt.Errorf("Failed to declare ephemeral queue: %w", err)
+	}
+	return q.Name, nil
+}
+
+func (c *Client) BindQueue(queueName, routingKey, exchangeName string) error {
+	err := c.ch.QueueBind(queueName, routingKey, exchangeName, false, nil)
+	if err != nil {
+		return fmt.Errorf("Failed to bind queue: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) PublishFanoutXML(ctx context.Context, exchangeName string, body []byte) error {
+	err := c.ch.PublishWithContext(ctx,
+		exchangeName,
+		"", // В fanout routing key игнорируется
+		false,
+		false,
+		amqp.Publishing{
+			DeliveryMode: amqp.Transient, // Сигналы отмены не храним на диске
+			ContentType:  "application/xml",
+			Body:         body,
+		})
+	if err != nil {
+		return fmt.Errorf("failed to publish fanout message: %w", err)
+	}
+	return nil
+}
