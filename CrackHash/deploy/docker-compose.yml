@@ -26,6 +26,7 @@ services:
       - "${MONGO_SEC2_EXT_PORT}:${MONGO_INNER_PORT}"
     networks:
       - crack-network
+
   mongo-setup:
     image: mongo:latest
     container_name: mongo-setup
@@ -51,6 +52,23 @@ services:
         sleep 5;
       "
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - crack-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q check_running
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   manager:
     build:
       context: ../
@@ -58,20 +76,24 @@ services:
     container_name: manager
     environment:
       PORT: ${INNER_SERVICE_PORT}
-      WORKER_URLS: ${WORKER_URLS}
       MANAGER_TASK_TIMEOUT: ${MANAGER_TASK_TIMEOUT}
       MANAGER_WATCH_INTERVAL: ${MANAGER_WATCH_INTERVAL}
+      TASK_PARTS_COUNT: ${TASK_PARTS_COUNT}
       READ_TIMEOUT: ${MANAGER_READ_TIMEOUT}
       WRITE_TIMEOUT: ${MANAGER_WRITE_TIMEOUT}
       IDLE_TIMEOUT: ${MANAGER_IDLE_TIMEOUT}
-      CLIENT_TIMEOUT: ${MANAGER_CLIENT_TIMEOUT}
       MONGODB_URL: ${MONGODB_URL}
       MONGODB_NAME: ${MONGODB_NAME}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      RABBITMQ_TASKS_QUEUE: ${RABBITMQ_TASKS_QUEUE}
+      RABBITMQ_RESULTS_QUEUE: ${RABBITMQ_RESULTS_QUEUE}
     ports:
       - "${MANAGER_PORT}:${INNER_SERVICE_PORT}"
     depends_on:
       mongo-setup:
         condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
     networks:
       - crack-network
 
@@ -82,15 +104,17 @@ services:
     container_name: worker1
     environment:
       PORT: ${WORKER_PORT}
-      MANAGER_URL: ${MANAGER_URL}
       READ_TIMEOUT: ${WORKER_READ_TIMEOUT}
       WRITE_TIMEOUT: ${WORKER_WRITE_TIMEOUT}
       IDLE_TIMEOUT: ${WORKER_IDLE_TIMEOUT}
-      CLIENT_TIMEOUT: ${WORKER_CLIENT_TIMEOUT}
       CONTEXT_CHECK_ITERATIONS: ${WORKER_CONTEXT_CHECK_ITERATIONS}
       STOP_ON_FIRST_MATCH: ${WORKER_STOP_ON_FIRST_MATCH}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      RABBITMQ_TASKS_QUEUE: ${RABBITMQ_TASKS_QUEUE}
+      RABBITMQ_RESULTS_QUEUE: ${RABBITMQ_RESULTS_QUEUE}
     depends_on:
-      - manager
+      rabbitmq:
+        condition: service_healthy
     networks:
       - crack-network
 
@@ -101,15 +125,17 @@ services:
     container_name: worker2
     environment:
       PORT: ${WORKER_PORT}
-      MANAGER_URL: ${MANAGER_URL}
       READ_TIMEOUT: ${WORKER_READ_TIMEOUT}
       WRITE_TIMEOUT: ${WORKER_WRITE_TIMEOUT}
       IDLE_TIMEOUT: ${WORKER_IDLE_TIMEOUT}
-      CLIENT_TIMEOUT: ${WORKER_CLIENT_TIMEOUT}
       CONTEXT_CHECK_ITERATIONS: ${WORKER_CONTEXT_CHECK_ITERATIONS}
       STOP_ON_FIRST_MATCH: ${WORKER_STOP_ON_FIRST_MATCH}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      RABBITMQ_TASKS_QUEUE: ${RABBITMQ_TASKS_QUEUE}
+      RABBITMQ_RESULTS_QUEUE: ${RABBITMQ_RESULTS_QUEUE}
     depends_on:
-      - manager
+      rabbitmq:
+        condition: service_healthy
     networks:
       - crack-network
 
@@ -120,15 +146,17 @@ services:
     container_name: worker3
     environment:
       PORT: ${WORKER_PORT}
-      MANAGER_URL: ${MANAGER_URL}
       READ_TIMEOUT: ${WORKER_READ_TIMEOUT}
       WRITE_TIMEOUT: ${WORKER_WRITE_TIMEOUT}
       IDLE_TIMEOUT: ${WORKER_IDLE_TIMEOUT}
-      CLIENT_TIMEOUT: ${WORKER_CLIENT_TIMEOUT}
       CONTEXT_CHECK_ITERATIONS: ${WORKER_CONTEXT_CHECK_ITERATIONS}
       STOP_ON_FIRST_MATCH: ${WORKER_STOP_ON_FIRST_MATCH}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      RABBITMQ_TASKS_QUEUE: ${RABBITMQ_TASKS_QUEUE}
+      RABBITMQ_RESULTS_QUEUE: ${RABBITMQ_RESULTS_QUEUE}
     depends_on:
-      - manager
+      rabbitmq:
+        condition: service_healthy
     networks:
       - crack-network
 

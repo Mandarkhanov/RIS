@@ -5,7 +5,6 @@ import (
 	"crackhash/pkg/domain"
 	"crackhash/pkg/util"
 	"encoding/json"
-	"encoding/xml"
 	"log"
 	"net/http"
 )
@@ -37,7 +36,6 @@ func (h *Handler) InitRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/hash/crack", h.handleCrackRequest)
 	mux.HandleFunc("/api/hash/status", h.handleCrackStatusCheck)
-	mux.HandleFunc("/internal/api/manager/hash/crack/request", h.handleWorkerResponse)
 	return mux
 }
 
@@ -89,29 +87,4 @@ func (h *Handler) handleCrackStatusCheck(w http.ResponseWriter, r *http.Request)
 
 	log.Printf("Returned task [%s] status", reqID)
 	util.RespondWithJSON(w, http.StatusOK, resp)
-}
-
-func (h *Handler) handleWorkerResponse(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPatch {
-		log.Printf("Failed to handleWorkerResponse: %s", ErrMsgNonPatchMethodNotAllowed)
-		util.RespondWithXMLError(w, http.StatusMethodNotAllowed, ErrMsgNonPatchMethodNotAllowed)
-		return
-	}
-
-	var resp domain.WorkerResponse
-	if err := xml.NewDecoder(r.Body).Decode(&resp); err != nil {
-		log.Printf("Failed to handleWorkerResponse: %v", err)
-		util.RespondWithXMLError(w, http.StatusBadRequest, ErrMsgInvalidXML)
-		return
-	}
-
-	err := h.svc.ProcessWorkerResult(r.Context(), resp)
-	if err != nil {
-		log.Printf("Failed to handleWorkerResponse: %v", err)
-		util.RespondWithXMLError(w, http.StatusInternalServerError, ErrMsgInternalServerError)
-		return
-	}
-
-	log.Printf("Processed worker response about task [%s]", resp.RequestID)
-	w.WriteHeader(http.StatusOK)
 }

@@ -1,14 +1,13 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"crackhash/manager/internal/config"
 	"crackhash/manager/internal/repository"
 	"crackhash/pkg/domain"
+	"crackhash/pkg/rabbitmq"
 	"encoding/xml"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,14 +25,16 @@ const (
 )
 
 type CrackManagerService struct {
-	cfg      *config.Config
-	taskRepo *repository.TaskRepository
+	cfg       *config.Config
+	taskRepo  *repository.TaskRepository
+	rmqClient *rabbitmq.Client
 }
 
-func NewCrackManagerService(cfg *config.Config, taskRepo *repository.TaskRepository) *CrackManagerService {
+func NewCrackManagerService(cfg *config.Config, taskRepo *repository.TaskRepository, rmqClient *rabbitmq.Client) *CrackManagerService {
 	return &CrackManagerService{
-		cfg:      cfg,
-		taskRepo: taskRepo,
+		cfg:       cfg,
+		taskRepo:  taskRepo,
+		rmqClient: rmqClient,
 	}
 }
 
@@ -45,7 +46,7 @@ func (s *CrackManagerService) CreateTask(ctx context.Context, req domain.CrackRe
 		Status:          domain.StatusInProgress,
 		Data:            []string{},
 		WorkersFinished: 0,
-		TotalWorkers:    len(s.cfg.WorkerURLs),
+		TotalWorkers:    s.cfg.TaskPartsCount,
 		CreatedAt:       time.Now(),
 	}
 
@@ -91,46 +92,28 @@ func (s *CrackManagerService) ProcessWorkerResult(ctx context.Context, resp doma
 }
 
 func (s *CrackManagerService) DispatchTasks(reqID string, req domain.CrackRequest) {
-	client := &http.Client{Timeout: s.cfg.ClientTimeout}
-
-	for i, workerURL := range s.cfg.WorkerURLs {
+	for i := 0; i < s.cfg.TaskPartsCount; i++ {
 		task := domain.WorkerTask{
 			RequestID:  reqID,
 			Hash:       req.Hash,
 			MaxLength:  req.MaxLength,
 			PartNumber: i + 1,
-			PartCount:  len(s.cfg.WorkerURLs),
+			PartCount:  s.cfg.TaskPartsCount,
 			Alphabet:   domain.Alphabet{Symbols: alphabet},
 		}
 
 		body, err := xml.Marshal(task)
 		if err != nil {
-			log.Printf("Failed to marshal task for worker %d: %v", i+1, err)
+			log.Printf("Failed to marshal task part %d: %v", i+1, err)
 			continue
 		}
 
-		taskURL := workerURL + WorkerTaskPath
-
-		go func(url string, body []byte) {
-			req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
-			if err != nil {
-				log.Printf("Failed creating http request for worker %s: %v", url, err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/xml")
-
-			resp, err := client.Do(req)
-			if err != nil {
-				log.Printf("Failed to send task to worker at %s: %v", url, err)
-				return
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				log.Printf("Worker %s return non-200 status code: %d", url, resp.StatusCode)
-			}
-
-		}(taskURL, body)
+		err = s.rmqClient.PublishXML(context.Background(), s.cfg.TasksQueue, body)
+		if err != nil {
+			log.Printf("Failed to publish task part %d to RMQ: %v", i+1, err)
+		} else {
+			log.Printf("Task %s (part %d/%d) published to RMQ", reqID, i+1, s.cfg.TaskPartsCount)
+		}
 	}
 }
 
@@ -153,37 +136,5 @@ func (s *CrackManagerService) TimeoutWatcher() {
 }
 
 func (s *CrackManagerService) CancelTask(reqID string) {
-	cancelReq := domain.WorkerCancelRequest{RequestID: reqID}
-
-	body, err := xml.Marshal(cancelReq)
-	if err != nil {
-		log.Printf("Failed marshalling cancel request: %v", err)
-		return
-	}
-
-	client := &http.Client{Timeout: s.cfg.ClientTimeout}
-
-	for _, workerURL := range s.cfg.WorkerURLs {
-		cancelURL := workerURL + WorkerCancelPath
-
-		go func(url string) {
-			req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(body))
-			if err != nil {
-				log.Printf("Failed creating http request for worker %s: %v", url, err)
-				return
-			}
-			req.Header.Set("Content-Type", "application/xml")
-
-			resp, err := client.Do(req)
-			if err != nil {
-				log.Printf("Failed to send cancel task to %s: %v", url, err)
-				return
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				log.Printf("Worker %s return non-200 status code: %d", url, resp.StatusCode)
-			}
-		}(cancelURL)
-	}
+	log.Printf("Cancellation logic for task %s will be implemented via RMQ Fanout later", reqID)
 }
