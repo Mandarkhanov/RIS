@@ -112,7 +112,15 @@ func (r *TaskRepository) GetAndMarkTimedOutTasks(ctx context.Context, timeout ti
 		if len(task.Data) > 0 {
 			newStatus = domain.StatusPartialReady
 		}
-		_, _ = r.collection.UpdateByID(ctx, task.ReqID, bson.M{"$set": bson.M{"status": newStatus}})
+
+		update := bson.M{
+			"$set": bson.M{
+				"status":       newStatus,
+				"pendingParts": []int{},
+			},
+		}
+
+		_, _ = r.collection.UpdateByID(ctx, task.ReqID, update)
 		cancelledIDs = append(cancelledIDs, task.ReqID)
 	}
 	return cancelledIDs, nil

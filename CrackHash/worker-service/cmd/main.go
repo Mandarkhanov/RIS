@@ -18,47 +18,17 @@ func main() {
 		log.Fatalf("Failed to load config : %v", err)
 	}
 
-	rmqClient, err := rabbitmq.NewClient(cfg.RabbitMQURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
-	}
+	rmqClient := rabbitmq.NewClient(cfg.RabbitMQURL)
 	defer rmqClient.Close()
-
-	if err := rmqClient.DeclareQueue(cfg.TasksQueue); err != nil {
-		log.Fatalf("Failed to declare tasks queue: %v", err)
-	}
-	if err := rmqClient.DeclareQueue(cfg.ResultsQueue); err != nil {
-		log.Fatalf("Failed to declare results queue: %v", err)
-	}
-
-	if err := rmqClient.DeclareExchange("cancel_exchange", "fanout"); err != nil {
-		log.Fatalf("Failed to declare cancel exchange: %v", err)
-	}
-	cancelQueueName, err := rmqClient.DeclareEphemeralQueue()
-	if err != nil {
-		log.Fatalf("Failed to declare ephemeral queue: %v", err)
-	}
-	if err := rmqClient.BindQueue(cancelQueueName, "", "cancel_exchange"); err != nil {
-		log.Fatalf("Failed to bind cancel queue: %v", err)
-	}
-	cancelMsgs, err := rmqClient.Consume(cancelQueueName)
-	if err != nil {
-		log.Fatalf("Failed to consume from cancel queue: %v", err)
-	}
 
 	activeTaskRepo := repository.NewActiveTaskRepository()
 	crackWorkerService := service.NewCrackWorkerService(cfg, activeTaskRepo, rmqClient)
 
 	cancelConsumer := amqp.NewCancelConsumer(crackWorkerService)
-	go cancelConsumer.Start(cancelMsgs)
-
-	msgs, err := rmqClient.Consume(cfg.TasksQueue)
-	if err != nil {
-		log.Fatalf("Failed to consume from tasks queue: %v", err)
-	}
+	rmqClient.ConsumeFanout("cancel_exchange", cancelConsumer.HandleMessage)
 
 	consumer := amqp.NewConsumer(crackWorkerService)
-	go consumer.Start(msgs)
+	rmqClient.Consume(cfg.TasksQueue, consumer.HandleMessage)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
