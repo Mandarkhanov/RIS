@@ -45,15 +45,15 @@ func (s *CrackManagerService) CreateTask(ctx context.Context, req domain.CrackRe
 	}
 
 	newState := &repository.RequestState{
-		ReqID:           uuid.New().String(),
-		Hash:            req.Hash,
-		MaxLength:       req.MaxLength,
-		Status:          domain.StatusInProgress,
-		Data:            []string{},
-		WorkersFinished: 0,
-		TotalWorkers:    s.cfg.TaskPartsCount,
-		PendingParts:    parts,
-		CreatedAt:       time.Now(),
+		ReqID:         uuid.New().String(),
+		Hash:          req.Hash,
+		MaxLength:     req.MaxLength,
+		Status:        domain.StatusInProgress,
+		Data:          []string{},
+		FinishedParts: []int{},
+		TotalWorkers:  s.cfg.TaskPartsCount,
+		PendingParts:  parts,
+		CreatedAt:     time.Now(),
 	}
 
 	finalReqID, err := s.taskRepo.StoreOrGetExists(ctx, newState)
@@ -128,7 +128,7 @@ func (s *CrackManagerService) GetTaskStatus(ctx context.Context, reqID string) (
 }
 
 func (s *CrackManagerService) ProcessWorkerResult(ctx context.Context, resp domain.WorkerResponse) error {
-	updatedState, err := s.taskRepo.AddWorkerResult(ctx, resp.RequestID, resp.Answers.Words)
+	updatedState, err := s.taskRepo.AddWorkerResult(ctx, resp.RequestID, resp.PartNumber, resp.Answers.Words)
 	if err != nil {
 		log.Printf("Failed to update db for task [%s]: %v", resp.RequestID, err)
 		return err

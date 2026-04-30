@@ -11,15 +11,15 @@ import (
 )
 
 type RequestState struct {
-	ReqID           string               `bson:"_id"`
-	Hash            string               `bson:"hash"`
-	MaxLength       int                  `bson:"maxLength"`
-	Status          domain.RequestStatus `bson:"status"`
-	Data            []string             `bson:"data"`
-	WorkersFinished int                  `bson:"workersFinished"`
-	TotalWorkers    int                  `bson:"totalWorkers"`
-	PendingParts    []int                `bson:"pendingParts"`
-	CreatedAt       time.Time            `bson:"createdAt"`
+	ReqID         string               `bson:"_id"`
+	Hash          string               `bson:"hash"`
+	MaxLength     int                  `bson:"maxLength"`
+	Status        domain.RequestStatus `bson:"status"`
+	Data          []string             `bson:"data"`
+	FinishedParts []int                `bson:"finishedParts"`
+	TotalWorkers  int                  `bson:"totalWorkers"`
+	PendingParts  []int                `bson:"pendingParts"`
+	CreatedAt     time.Time            `bson:"createdAt"`
 }
 
 type TaskRepository struct {
@@ -69,11 +69,13 @@ func (r *TaskRepository) Get(ctx context.Context, reqID string) (*RequestState, 
 	return &state, true
 }
 
-func (r *TaskRepository) AddWorkerResult(ctx context.Context, reqID string, words []string) (*RequestState, error) {
-	update := bson.M{"$inc": bson.M{"workersFinished": 1}}
+func (r *TaskRepository) AddWorkerResult(ctx context.Context, reqID string, partNumber int, words []string) (*RequestState, error) {
+	addToSet := bson.M{"finishedParts": partNumber}
 	if len(words) > 0 {
-		update["$push"] = bson.M{"data": bson.M{"$each": words}}
+		addToSet["data"] = bson.M{"$each": words}
 	}
+
+	update := bson.M{"$addToSet": addToSet}
 
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 	var updatedState RequestState
@@ -82,7 +84,7 @@ func (r *TaskRepository) AddWorkerResult(ctx context.Context, reqID string, word
 		return nil, err
 	}
 
-	if updatedState.WorkersFinished == updatedState.TotalWorkers {
+	if len(updatedState.FinishedParts) == updatedState.TotalWorkers {
 		_, _ = r.collection.UpdateByID(ctx, reqID, bson.M{"$set": bson.M{"status": domain.StatusReady}})
 		updatedState.Status = domain.StatusReady
 	}

@@ -74,6 +74,7 @@ services:
       context: ../
       dockerfile: manager-service/Dockerfile
     container_name: manager
+    restart: always
     environment:
       PORT: ${INNER_SERVICE_PORT}
       MANAGER_TASK_TIMEOUT: ${MANAGER_TASK_TIMEOUT}
