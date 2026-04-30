@@ -159,5 +159,18 @@ func (s *CrackManagerService) TimeoutWatcher() {
 }
 
 func (s *CrackManagerService) CancelTask(reqID string) {
-	log.Printf("Cancellation logic for task [%s] will be implemented via RMQ Fanout later", reqID)
+	cancelReq := domain.WorkerCancelRequest{RequestID: reqID}
+
+	body, err := xml.Marshal(cancelReq)
+	if err != nil {
+		log.Printf("Failed marshalling cancel request: %v", err)
+		return
+	}
+
+	err = s.rmqClient.PublishFanoutXML(context.Background(), "cancel_exchange", body)
+	if err != nil {
+		log.Printf("Failed to publish cancel message: %v", err)
+	} else {
+		log.Printf("Cancel signal for task [%s] sent to all workers via fanout", reqID)
+	}
 }

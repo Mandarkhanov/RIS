@@ -37,9 +37,15 @@ func (s *CrackWorkerService) CancelTask(reqID string) {
 
 func (s *CrackWorkerService) ProcessTask(ctx context.Context, task domain.WorkerTask) {
 	childCtx, cancel := context.WithCancel(ctx)
-	if !s.activeTasksRepo.Add(task.RequestID, cancel) {
+	added, cancelled := s.activeTasksRepo.Add(task.RequestID, cancel)
+	if cancelled {
 		cancel()
-		log.Printf("Task %s (Part %d) is already running.", task.RequestID, task.PartNumber)
+		log.Printf("Task [%s] was previously cancelled. Skipping part %d.", task.RequestID, task.PartNumber)
+		return
+	}
+	if !added {
+		cancel()
+		log.Printf("Task [%s] (Part %d) is already running.", task.RequestID, task.PartNumber)
 		return
 	}
 	defer s.CancelTask(task.RequestID)
@@ -71,7 +77,7 @@ func (s *CrackWorkerService) ProcessTask(ctx context.Context, task domain.Worker
 		return
 	}
 
-	log.Printf("Started processing task [%d, %d)\n", startIdx, endIdx)
+	log.Printf("Started processing task [%s] part %d [%d, %d)\n", task.RequestID, task.PartNumber, startIdx, endIdx)
 	gen := generator.NewGenerator(alphabetBytes, startIdx)
 	wordBuf := make([]byte, len(gen.State))
 
