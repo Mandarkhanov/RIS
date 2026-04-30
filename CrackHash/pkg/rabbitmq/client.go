@@ -18,19 +18,13 @@ func NewClient(amqpURL string) (*Client, error) {
 	var conn *amqp.Connection
 	var err error
 
-	maxRetries := 15
-	for i := 1; i <= maxRetries; i++ {
+	for {
 		conn, err = amqp.Dial(amqpURL)
 		if err == nil {
 			break
 		}
-
-		log.Printf("RabbitMQ is not ready yet, retrying in 2s... (Attempt %d/%d)", i, maxRetries)
-		time.Sleep(2 * time.Second)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to RabbitMQ after %d attempts: %w", maxRetries, err)
+		log.Printf("RabbitMQ is not ready yet, retrying in 2s... Error: %v", err)
+		time.Sleep(5 * time.Second)
 	}
 
 	ch, err := conn.Channel()
@@ -49,6 +43,13 @@ func NewClient(amqpURL string) (*Client, error) {
 		conn.Close()
 		return nil, fmt.Errorf("Failed to set QoS: %w", err)
 	}
+
+	go func() {
+		closeErr := <-conn.NotifyClose(make(chan *amqp.Error))
+		if closeErr != nil {
+			log.Fatalf("RabbitMQ connection closed: %v. Crashing service to trigger Docker restart...", closeErr)
+		}
+	}()
 
 	return &Client{
 		conn: conn,
