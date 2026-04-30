@@ -5,6 +5,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/writeconcern" // <-- Добавлен импорт
 )
 
 type MongoConnection struct {
@@ -13,7 +14,8 @@ type MongoConnection struct {
 }
 
 func NewMongoConnection(ctx context.Context, url string, dbName string) (*MongoConnection, error) {
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(url))
+	clientOpts := options.Client().ApplyURI(url).SetWriteConcern(writeconcern.Majority())
+	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
 		return nil, err
 	}

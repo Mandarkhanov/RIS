@@ -70,7 +70,7 @@ func main() {
 	}
 
 	go crackManagerService.TimeoutWatcher()
-
+	go crackManagerService.OutboxRelay()
 	go func() {
 		log.Println("Manager REST API started on :" + cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
