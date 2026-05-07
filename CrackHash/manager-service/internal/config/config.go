@@ -17,7 +17,7 @@ const (
 	DefaultRabbitMQURL       = "amqp://guest:guest@localhost:5672/"
 	DefaultTasksQueue        = "tasks_queue"
 	DefaultResultsQueue      = "results_queue"
-	DefaultTaskPartsCount    = 5
+	DefaultTaskPartsCount    = 3
 )
 
 type Config struct {

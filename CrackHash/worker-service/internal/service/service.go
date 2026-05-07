@@ -37,6 +37,7 @@ func (s *CrackWorkerService) CancelTask(reqID string) {
 
 func (s *CrackWorkerService) ProcessTask(ctx context.Context, task domain.WorkerTask) {
 	childCtx, cancel := context.WithCancel(ctx)
+
 	added, cancelled := s.activeTasksRepo.Add(task.RequestID, cancel)
 	if cancelled {
 		cancel()
@@ -48,14 +49,15 @@ func (s *CrackWorkerService) ProcessTask(ctx context.Context, task domain.Worker
 		log.Printf("Task [%s] (Part %d) is already running.", task.RequestID, task.PartNumber)
 		return
 	}
-	defer s.CancelTask(task.RequestID)
+
+	defer s.activeTasksRepo.Remove(task.RequestID)
 
 	var foundWords []string
 
 	alphabetStr := strings.Join(task.Alphabet.Symbols, "")
 	alphabetBytes := []byte(alphabetStr)
 	aLen := len(alphabetBytes)
-	totalCombinations := generator.TotalWords(aLen, task.MaxLength)
+	totalCombinations := generator.TotalWords(task.MaxLength, aLen)
 
 	chunkSize := (totalCombinations + int64(task.PartCount) - 1) / int64(task.PartCount)
 	startIdx := int64(task.PartNumber-1) * chunkSize
@@ -77,7 +79,8 @@ func (s *CrackWorkerService) ProcessTask(ctx context.Context, task domain.Worker
 		return
 	}
 
-	log.Printf("Started processing task [%s] part %d [%d, %d)\n", task.RequestID, task.PartNumber, startIdx, endIdx)
+	log.Printf("Started processing task [%s] part %d\n", task.RequestID, task.PartNumber)
+	log.Printf("totalCombinations: %d\tchunkSize: %d\t indexes: [%d; %d)", totalCombinations, chunkSize, startIdx, endIdx)
 	gen := generator.NewGenerator(alphabetBytes, startIdx)
 	wordBuf := make([]byte, len(gen.State))
 
