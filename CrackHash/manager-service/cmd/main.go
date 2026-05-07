@@ -36,31 +36,13 @@ func main() {
 		log.Fatalf("Failed to init TaskRepository: %v", err)
 	}
 
-	rmqClient, err := rabbitmq.NewClient(cfg.RabbitMQURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
-	}
+	rmqClient := rabbitmq.NewClient(cfg.RabbitMQURL)
 	defer rmqClient.Close()
-
-	if err := rmqClient.DeclareQueue(cfg.TasksQueue); err != nil {
-		log.Fatalf("Failed to declare tasks queue: %v", err)
-	}
-	if err := rmqClient.DeclareQueue(cfg.ResultsQueue); err != nil {
-		log.Fatalf("Failed to declare results queue: %v", err)
-	}
-
-	if err := rmqClient.DeclareExchange("cancel_exchange", "fanout"); err != nil {
-		log.Fatalf("Failed to declare cancel exchange: %v", err)
-	}
 
 	crackManagerService := service.NewCrackManagerService(cfg, taskRepo, rmqClient)
 
-	msgs, err := rmqClient.Consume(cfg.ResultsQueue)
-	if err != nil {
-		log.Fatalf("Failed to consume from results queue: %v", err)
-	}
 	amqpConsumer := amqp.NewConsumer(crackManagerService)
-	go amqpConsumer.Start(msgs)
+	rmqClient.Consume(cfg.ResultsQueue, amqpConsumer.HandleMessage)
 
 	handler := rest.NewHandler(crackManagerService)
 	mux := handler.InitRoutes()

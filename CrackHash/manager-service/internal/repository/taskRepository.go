@@ -84,10 +84,17 @@ func (r *TaskRepository) AddWorkerResult(ctx context.Context, reqID string, part
 		return nil, err
 	}
 
-	if len(updatedState.FinishedParts) == updatedState.TotalWorkers {
-		_, _ = r.collection.UpdateByID(ctx, reqID, bson.M{"$set": bson.M{"status": domain.StatusReady}})
-		updatedState.Status = domain.StatusReady
+	var newStatus domain.RequestStatus
+
+	if updatedState.Status == domain.StatusInProgress && len(updatedState.FinishedParts) == updatedState.TotalWorkers {
+		newStatus = domain.StatusReady
 	}
+
+	if newStatus != "" {
+		_, _ = r.collection.UpdateByID(ctx, reqID, bson.M{"$set": bson.M{"status": newStatus}})
+		updatedState.Status = newStatus
+	}
+
 	return &updatedState, nil
 }
 
@@ -112,7 +119,15 @@ func (r *TaskRepository) GetAndMarkTimedOutTasks(ctx context.Context, timeout ti
 		if len(task.Data) > 0 {
 			newStatus = domain.StatusPartialReady
 		}
-		_, _ = r.collection.UpdateByID(ctx, task.ReqID, bson.M{"$set": bson.M{"status": newStatus}})
+
+		update := bson.M{
+			"$set": bson.M{
+				"status":       newStatus,
+				"pendingParts": []int{},
+			},
+		}
+
+		_, _ = r.collection.UpdateByID(ctx, task.ReqID, update)
 		cancelledIDs = append(cancelledIDs, task.ReqID)
 	}
 	return cancelledIDs, nil

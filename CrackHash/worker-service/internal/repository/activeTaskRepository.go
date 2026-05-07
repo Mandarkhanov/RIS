@@ -54,3 +54,13 @@ func (r *ActiveTaskRepository) CancelAll() {
 		delete(r.activeTasks, reqID)
 	}
 }
+
+func (r *ActiveTaskRepository) Remove(reqID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if cancel, exists := r.activeTasks[reqID]; exists {
+		cancel()
+		delete(r.activeTasks, reqID)
+	}
+}
